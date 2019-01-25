@@ -1,22 +1,39 @@
-import {vec3} from 'gl-matrix';
+import {vec3, vec4} from 'gl-matrix';
 import * as Stats from 'stats-js';
 import * as DAT from 'dat-gui';
 import Icosphere from './geometry/Icosphere';
 import Square from './geometry/Square';
+import Cube from './geometry/Cube';
 import OpenGLRenderer from './rendering/gl/OpenGLRenderer';
 import Camera from './Camera';
 import {setGL} from './globals';
 import ShaderProgram, {Shader} from './rendering/gl/ShaderProgram';
 
+// Data.GUI does not convert the hex color string
+// to rgb array automatically in the version we're using.
+// Expects a string in the format '#rrggbb'
+// From: https://stackoverflow.com/questions/5623838/rgb-to-hex-and-hex-to-rgb
+function hex_to_rgb(hex: string) : number[] {
+  let i = parseInt(hex.slice(1), 16);
+  let r = (i >> 16) & 255;
+  let g = (i >> 8) & 255;
+  let b = i & 255;
+  return [r / 255.0, g / 255.0, b / 255.0];
+}
+
 // Define an object with application parameters and button callbacks
 // This will be referred to by dat.GUI's functions that add GUI elements.
 const controls = {
   tesselations: 5,
-  'Load Scene': loadScene, // A function pointer, essentially
+  // Note that the list formats will not act properly
+  shader: 'lambert',
+  color: '#ff0000',    
+  'Load Scene': loadScene // A function pointer, essentially
 };
 
 let icosphere: Icosphere;
 let square: Square;
+let cube: Cube;
 let prevTesselations: number = 5;
 
 function loadScene() {
@@ -24,6 +41,8 @@ function loadScene() {
   icosphere.create();
   square = new Square(vec3.fromValues(0, 0, 0));
   square.create();
+  cube = new Cube();
+  cube.create();
 }
 
 function main() {
@@ -34,11 +53,6 @@ function main() {
   stats.domElement.style.left = '0px';
   stats.domElement.style.top = '0px';
   document.body.appendChild(stats.domElement);
-
-  // Add controls to the gui
-  const gui = new DAT.GUI();
-  gui.add(controls, 'tesselations', 0, 8).step(1);
-  gui.add(controls, 'Load Scene');
 
   // get canvas and webgl context
   const canvas = <HTMLCanvasElement> document.getElementById('canvas');
@@ -63,6 +77,21 @@ function main() {
     new Shader(gl.VERTEX_SHADER, require('./shaders/lambert-vert.glsl')),
     new Shader(gl.FRAGMENT_SHADER, require('./shaders/lambert-frag.glsl')),
   ]);
+  const custom_shader = new ShaderProgram([
+    new Shader(gl.VERTEX_SHADER, require('./shaders/custom-vert.glsl')),
+    new Shader(gl.FRAGMENT_SHADER, require('./shaders/custom-frag.glsl'))
+  ]);
+  let shaders_dict: any = {
+    'lambert': lambert,
+    'custom': custom_shader
+  };
+
+  // Add controls to the gui
+  const gui = new DAT.GUI();
+  gui.add(controls, 'tesselations', 0, 8).step(1);
+  gui.addColor(controls, 'color');
+  gui.add(controls, 'shader', Object.keys(shaders_dict));
+  gui.add(controls, 'Load Scene');
 
   // This function will be called every frame
   function tick() {
@@ -76,10 +105,13 @@ function main() {
       icosphere = new Icosphere(vec3.fromValues(0, 0, 0), 1, prevTesselations);
       icosphere.create();
     }
-    renderer.render(camera, lambert, [
+    let rgb_color = hex_to_rgb(controls.color);
+    let current_shader = shaders_dict[controls.shader];
+    renderer.render(camera, current_shader, [
       icosphere,
-      // square,
-    ]);
+      //square,
+      //cube,
+    ], vec4.fromValues(rgb_color[0], rgb_color[1], rgb_color[2], 1));
     stats.end();
 
     // Tell the browser to call `tick` again whenever it renders a new frame

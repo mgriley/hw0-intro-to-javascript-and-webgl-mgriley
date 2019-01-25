@@ -1,5 +1,8 @@
 # CIS 566 Homework 0: Intro to Javascript and WebGL
 
+## Deployed at:
+https://mgriley.github.io/hw0-intro-to-javascript-and-webgl-mgriley/
+
 ## Objective
 - Check that the tools and build configuration we will be using for the class works.
 - Start learning Typescript and WebGL2
